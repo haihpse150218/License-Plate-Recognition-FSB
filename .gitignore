@@ -12,7 +12,7 @@ venv/
 *.swp
 
 # --- Datasets (Dữ liệu nặng không nên up lên Git) ---
-# data/
+data/
 test_images/
 
 # --- Training Results (Mô hình và log train) ---
