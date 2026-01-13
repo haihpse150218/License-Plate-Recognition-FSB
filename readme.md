@@ -61,3 +61,13 @@ source venv/bin/activate
 
 # Cài đặt thư viện từ file requirements.txt
 pip install -r requirements.txt
+```
+**Bước 2: Train YOLO**
+```bash
+python scripts/check_data.py
+python train_yolo11.py
+```
+**Bước 3: Run OCR test Result**
+```bash
+python full_pipline.py
+```
