@@ -46,7 +46,7 @@ Tài liệu này hướng dẫn chi tiết cách thiết lập môi trường v�
 **Bước 1: Mở Terminal tại thư mục gốc dự án**
 
 Đổi tên thư mục root: `D:/MSA-FPT/Final-project`
-
+![alt text](image.png)
 **Bước 2: Tạo môi trường ảo (Virtual Environment)**
 Để cách ly thư viện dự án với hệ thống, hãy chạy lệnh sau:
 ```bash
@@ -61,3 +61,13 @@ source venv/bin/activate
 
 # Cài đặt thư viện từ file requirements.txt
 pip install -r requirements.txt
+```
+**Bước 2: Train YOLO**
+```bash
+python scripts/check_data.py
+python train_yolo11.py
+```
+**Bước 3: Run OCR test Result**
+```bash
+python full_pipline.py
+```
