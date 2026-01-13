@@ -1,0 +1,33 @@
+# --- Python & Environment ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv_yolo11/
+venv/
+.env
+
+# --- IDE Settings (VSCode, PyCharm...) ---
+.idea/
+.vscode/
+*.swp
+
+# --- Datasets (Dữ liệu nặng không nên up lên Git) ---
+# data/
+test_images/
+
+# --- Training Results (Mô hình và log train) ---
+# Folder runs chứa weights rất nặng
+runs/
+
+# --- Generated Outputs (Kết quả chạy pipeline) ---
+results_final/
+results_crop/
+crop_images/
+
+# --- Large Model Files (Nếu lỡ để file .pt ở ngoài root) ---
+*.pt
+*.onnx
+
+# --- System Files ---
+Thumbs.db
+Desktop.ini
