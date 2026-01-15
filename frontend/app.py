@@ -23,48 +23,138 @@ st.markdown("Chọn tab để upload ảnh hoặc dùng camera realtime.")
 tab1, tab2 = st.tabs(["📁 Upload Ảnh", "🎥 Camera Real-time"])
 
 # ----------------------- TAB 1: Upload Ảnh -----------------------
+# ----------------------- TAB 1: Upload + Camera -----------------------
+# ----------------------- TAB 1: Upload + Camera -----------------------
+# ----------------------- TAB 1: Upload + Camera -----------------------
 with tab1:
-    st.subheader("Upload ảnh xe")
-    uploaded_file = st.file_uploader("Chọn file ảnh (jpg/png)", type=["jpg", "jpeg", "png"])
+    st.subheader("Upload hoặc chụp ảnh xe")
+
+    # ===== INIT SESSION STATE =====
+    if "input_image_bytes" not in st.session_state:
+        st.session_state.input_image_bytes = None
+        st.session_state.input_image_name = None
+        st.session_state.input_image_type = None
+
+    if "show_camera" not in st.session_state:
+        st.session_state.show_camera = False
+
+    if "action" not in st.session_state:
+        st.session_state.action = None
+
+    # ===== UPLOAD IMAGE =====
+    uploaded_file = st.file_uploader(
+        "📁 Upload ảnh (jpg/png)",
+        type=["jpg", "jpeg", "png"],
+        key="upload_image_tab1"
+    )
 
     if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Ảnh gốc", use_container_width=True)
+        st.session_state.input_image_bytes = uploaded_file.getvalue()
+        st.session_state.input_image_name = uploaded_file.name
+        st.session_state.input_image_type = uploaded_file.type
 
-        if st.button("Xử lý ảnh"):
-            with st.spinner("Đang detect và OCR..."):
-                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                response = requests.post(API_URL, files=files)
+    # ===== CAMERA BUTTON =====
+    if not st.session_state.show_camera:
+        if st.button("📸 Bật camera", key="btn_show_camera"):
+            st.session_state.action = "show_camera"
+            st.rerun()
+    else:
+        camera_photo = st.camera_input(
+            "Chụp ảnh",
+            key="camera_input_tab1"
+        )
+        if camera_photo is not None:
+            st.session_state.input_image_bytes = camera_photo.getvalue()
+            st.session_state.input_image_name = "camera.jpg"
+            st.session_state.input_image_type = "image/jpeg"
 
-                if response.status_code == 200:
-                    data = response.json()
-                    if data["status"] == "success":
-                        st.success("Xử lý thành công!")
+            st.session_state.show_camera = False
+            st.rerun()
 
-                        # Xây dựng URL đầy đủ cho ảnh processed
-                        processed_relative = data["processed_image_url"]
-                        processed_url = f"{BACKEND_HOST}{processed_relative}"
-                        processed_response = requests.get(processed_url)
-                        if processed_response.status_code == 200:
-                            st.image(processed_response.content, caption="Ảnh đã detect & OCR", use_container_width=True)
+    # ===== HANDLE ACTIONS (ONE PLACE ONLY) =====
+    if st.session_state.action == "show_camera":
+        st.session_state.show_camera = True
+        st.session_state.action = None
 
-                        st.subheader("Kết quả nhận diện")
-                        for det in data["detections"]:
-                            st.write(f"**Biển số:** {det['plate']}")
-                            st.write(f"**Độ tin cậy:** {det['confidence']:.2f}")
-                            st.write(f"**Vị trí bbox:** {det['bbox']}")
+    elif st.session_state.action == "clear_image":
+        st.session_state.input_image_bytes = None
+        st.session_state.input_image_name = None
+        st.session_state.input_image_type = None
+        st.session_state.show_camera = False
+        st.session_state.action = None
 
-                            if "crop_path" in det:
-                                # Xây dựng URL đầy đủ cho crop
-                                crop_relative = det["crop_path"].replace("crop_images", "/crops")
-                                crop_url = f"{BACKEND_HOST}{crop_relative}"
-                                crop_response = requests.get(crop_url)
-                                if crop_response.status_code == 200:
-                                    st.image(crop_response.content, caption=f"Crop biển số: {det['plate']}", width=300)
-                    else:
-                        st.error("Lỗi từ backend: " + str(data))
+    # ===== PREVIEW (ONE IMAGE BOX) =====
+    st.markdown("### Ảnh đầu vào")
+
+    if st.session_state.input_image_bytes:
+        image = Image.open(
+            io.BytesIO(st.session_state.input_image_bytes)
+        )
+        st.image(
+            image,
+            caption="Ảnh đang xử lý",
+            use_container_width=True
+        )
+    else:
+        st.info("Chưa có ảnh. Vui lòng upload hoặc chụp ảnh.")
+
+    # ===== ACTION BUTTONS =====
+    col1, col2 = st.columns(2)
+
+    with col1:
+        process_clicked = st.button(
+            "🚀 Xử lý ảnh",
+            key="btn_process_image",
+            disabled=st.session_state.input_image_bytes is None
+        )
+
+    with col2:
+        if st.button(
+            "❌ Xóa ảnh",
+            key="btn_clear_image",
+            disabled=st.session_state.input_image_bytes is None
+        ):
+            st.session_state.action = "clear_image"
+            st.rerun()
+
+    # ===== OCR PROCESS =====
+    if process_clicked:
+        with st.spinner("Đang detect và OCR..."):
+            files = {
+                "file": (
+                    st.session_state.input_image_name,
+                    st.session_state.input_image_bytes,
+                    st.session_state.input_image_type
+                )
+            }
+
+            response = requests.post(API_URL, files=files)
+
+            if response.status_code == 200:
+                data = response.json()
+
+                if data.get("status") == "success":
+                    st.success("Xử lý thành công!")
+
+                    processed_url = f"{BACKEND_HOST}{data['processed_image_url']}"
+                    processed_response = requests.get(processed_url)
+
+                    if processed_response.status_code == 200:
+                        st.image(
+                            processed_response.content,
+                            caption="Ảnh đã detect & OCR",
+                            use_container_width=True
+                        )
+
+                    st.subheader("Kết quả nhận diện")
+                    for det in data["detections"]:
+                        st.write(f"**Biển số:** {det['plate']}")
+                        st.write(f"**Độ tin cậy:** {det['confidence']:.2f}")
+                        st.write(f"**BBox:** {det['bbox']}")
                 else:
-                    st.error(f"Lỗi kết nối backend: {response.status_code} - {response.text}")
+                    st.error("Backend xử lý thất bại")
+            else:
+                st.error(f"Lỗi backend: {response.status_code}")
 
 # ----------------------- TAB 2: Camera Real-time -----------------------
 with tab2:
