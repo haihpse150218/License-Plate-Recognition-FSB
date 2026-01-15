@@ -23,6 +23,8 @@ runs/
 results_final/
 results_crop/
 crop_images/
+results/
+uploads/
 
 # --- Large Model Files (Nếu lỡ để file .pt ở ngoài root) ---
 *.pt
