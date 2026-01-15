@@ -29,15 +29,17 @@ async def ocr_image(file: UploadFile = File(...)):
         
         if "error" in result:
             return JSONResponse(status_code=400, content={"error": result["error"]})
-
+        
         res = {
             "status": "success",
             "processed_image_url": f"/results/{os.path.basename(result['processed_image'])}",
-            "detections": result["detections"]
+            "detections": result["detections"],
+            "type": result["type"]
         }
         print(res)
         return res
     except Exception as e:
+        print(e)
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.get("/")

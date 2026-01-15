@@ -151,6 +151,7 @@ with tab1:
                         st.write(f"**Biển số:** {det['plate']}")
                         st.write(f"**Độ tin cậy:** {det['confidence']:.2f}")
                         st.write(f"**BBox:** {det['bbox']}")
+                        st.write(f"**type:** {det['type']}")
                 else:
                     st.error("Backend xử lý thất bại")
             else:

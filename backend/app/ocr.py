@@ -9,6 +9,7 @@ import re
 import uuid  # Để tạo tên file unique
 import config
 from pathlib import Path
+import re
 print("import OCR")
 
 def full_pipeline(image_bytes: bytes, model_path=None):
@@ -92,8 +93,23 @@ def full_pipeline(image_bytes: bytes, model_path=None):
 
     # Xóa file tạm
     os.remove(temp_path)
-
+    
+    plate_string = detections[0].get("plate", "")
+    type_vehicle = detect_plate_type(plate_string)
+    print(plate_string)
+    print(output_path)
+    
+    
     return {
         "processed_image": output_path,
-        "detections": detections
+        "detections": detections,
+        "type": type_vehicle
     }
+    
+def detect_plate_type(plate: str) -> str:
+    if re.match(config.REGEX_OTO, plate):
+        return "Ôtô"
+    elif re.match(config.REGEX_XEMAY, plate):
+        return "Xe máy"
+    else:
+        return "Không xác định"
