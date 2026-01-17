@@ -108,7 +108,5 @@ def full_pipeline(source_path, model_path="runs/detect/latest_best.pt"):
 if __name__ == "__main__":
     # Test
     # Đảm bảo đường dẫn này tồn tại
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-    test_folder = os.path.join(project_root, "data", "test", "images")
+    test_folder = "D:/MSA-FPT/Final-project/data/test/images" 
     full_pipeline(test_folder)
