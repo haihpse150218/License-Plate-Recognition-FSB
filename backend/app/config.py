@@ -9,3 +9,8 @@ def setup_config():
 
 REGEX_OTO = r'^\d{2}-?[A-Z]-?\d{3}\.?\d{2}$'
 REGEX_XEMAY = r'^(?:\d{2}-?[A-Z]\d-?\d{2,3}\.?\d{2}|\d{2}-?[A-Z]{2}-?\d{2,3}\.?\d{2})$'
+MODEL_PATH = (
+    Path(BASE_DIR)
+    / "runs/detect/latest_best.pt"
+)
+MODEL_PATH = MODEL_PATH.resolve()

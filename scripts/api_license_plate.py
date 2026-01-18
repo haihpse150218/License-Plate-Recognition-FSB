@@ -11,7 +11,10 @@ import base64
 import io
 from PIL import Image
 from typing import List, Optional
+import re
 import uvicorn
+import uuid
+import config
 
 # Import các function từ manual_full_pipline.py
 from manual_full_pipline import (
@@ -115,10 +118,10 @@ def image_from_base64(base64_string: str) -> np.ndarray:
     return image_from_bytes(image_bytes)
 
 
-def detect_plates(image: np.ndarray, conf_threshold: float = 0.4) -> List[PlateResult]:
+def detect_plates(image: np.ndarray, conf_threshold: float = 0.4, isDebug=False) -> List[PlateResult]:
 
     global yolo_model, trocr_loaded
-    
+    img_name = f"temp_{uuid.uuid4().hex}.jpg"
     if yolo_model is None:
         raise RuntimeError("YOLO model chưa được khởi tạo")
     
@@ -159,6 +162,22 @@ def detect_plates(image: np.ndarray, conf_threshold: float = 0.4) -> List[PlateR
                 plate_text, ocr_confidence, _ = process_two_line_plate(cropped, save_dir=None)
             else:
                 plate_text, ocr_confidence, _ = process_single_line_plate(cropped, save_dir=None)
+            #Lưu crop nếu cần debug
+            if isDebug:
+                safe_plate = re.sub(r'[<>:"/\\|?*]', '_', plate_text)
+                crop_name = f"{img_name}_plate_{safe_plate}.jpg"
+                crop_path = os.path.join("crop_images", crop_name)
+                os.makedirs("crop_images", exist_ok=True)
+                cv2.imwrite(crop_path, cropped)
+            #Lưu result nếu cần debug
+            if isDebug:
+                debug_img = image.copy()
+                cv2.rectangle(debug_img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(debug_img, f"{plate_text} ({detection_conf:.2f})", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                debug_path = os.path.join("results", f"debug_{img_name}")
+                os.makedirs("results", exist_ok=True)
+                cv2.imwrite(debug_path, debug_img)
             
             # Tạo kết quả
             result = PlateResult(
@@ -171,6 +190,14 @@ def detect_plates(image: np.ndarray, conf_threshold: float = 0.4) -> List[PlateR
             results.append(result)
     
     return results
+
+def detect_plate_type(plate: str) -> str:
+    if re.match(config.REGEX_OTO, plate):
+        return "Ôtô"
+    elif re.match(config.REGEX_XEMAY, plate):
+        return "Xe máy"
+    else:
+        return "Không xác định"
 
 
 @app.on_event("startup")
@@ -215,12 +242,16 @@ async def detect_from_file(
     file: UploadFile = File(..., description="Ảnh cần detect biển số"),
     conf: float = 0.4
 ):
-
-
     try:
         # Đọc file
         image_bytes = await file.read()
         image = image_from_bytes(image_bytes)
+        # Tạo tên file tạm unique
+        temp_filename = f"temp_{uuid.uuid4().hex}.jpg"
+        temp_path = os.path.join("uploads", temp_filename)
+        os.makedirs("uploads", exist_ok=True)
+        # Lưu ảnh
+        cv2.imwrite(temp_path, image)
         
         # Detect biển số
         plates = detect_plates(image, conf_threshold=conf)
