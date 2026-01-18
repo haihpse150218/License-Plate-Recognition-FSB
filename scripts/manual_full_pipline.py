@@ -14,6 +14,10 @@ import numpy as np
 from PIL import Image
 import torch
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+import sqlite3
+import random
+from datetime import datetime
+import uuid
 
 # Biến toàn cục cho TrOCR model
 trocr_processor = None
@@ -391,7 +395,7 @@ def process_single_line_plate(cropped, save_dir=None):
 #    - Phân loại: 1 dòng hay 2 dòng
 #    - OCR bằng TrOCR
 #    - Lưu kết quả
-def full_pipeline(source_path, model_path=None):
+def full_pipeline(source_path, model_path=None, is_save_db=False, isDebug=False):
  
     # Tự động tìm project root
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -525,6 +529,7 @@ def full_pipeline(source_path, model_path=None):
                 else:
                     plate, best_confidence, best_version = process_single_line_plate(cropped, save_dir=plate_folder)
                 
+                type_of_vehicle = detect_plate_type(plate)
                 # Hiển thị kết quả
                 if is_two_line:
                     print(f"Biển số {plate_count} (2 dòng): {plate} (confidence: {best_confidence:.2f}, TrOCR)")
@@ -537,6 +542,7 @@ def full_pipeline(source_path, model_path=None):
                 # Debug
                 with open(result_file, 'w', encoding='utf-8') as f:
                     f.write(f"Biển số: {plate}\n")
+                    f.write(f"Loại xe: {type_of_vehicle}\n")
                     f.write(f"Confidence: {best_confidence:.4f}\n")
                     f.write(f"Loại: {'2 dòng' if is_two_line else '1 dòng'}\n")
                     f.write(f"Xử lý: Ảnh gốc (không qua preprocessing)\n")
@@ -553,6 +559,23 @@ def full_pipeline(source_path, model_path=None):
         if has_detection:
             output_path = os.path.join(image_folder, f"result_with_boxes.jpg")
             cv2.imwrite(output_path, img)
+            if is_save_db:
+                # Lưu từng biển số vào database
+                for r in results:
+                    boxes = r.boxes
+                    for box in boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        x1, y1 = max(0, x1), max(0, y1)
+                        x2, y2 = min(w_img, x2), min(h_img, y2)
+                        cropped = img[y1:y2, x1:x2]
+                        h_crop, w_crop = cropped.shape[:2]
+                        is_two_line = detect_two_line_plate(cropped)
+                        if is_two_line:
+                            plate, best_confidence, best_version = process_two_line_plate(cropped)
+                        else:
+                            plate, best_confidence, best_version = process_single_line_plate(cropped)
+                        type_of_vehicle = detect_plate_type(plate)
+                        save_to_db(plate, type_of_vehicle, best_confidence, image_path=img_path, db_path="license_plates.db")
             print(f"Đã lưu ảnh kết quả tại: {output_path}\n")
         else:
             print("Không tìm thấy biển số nào.\n")
@@ -567,9 +590,95 @@ def full_pipeline(source_path, model_path=None):
     print(f"    + result.txt (thông tin kết quả OCR)")
     print(f"    + result_with_boxes.jpg (ảnh gốc có vẽ bounding box)")
 
+def detect_plate_type(plate: str) -> str:
+    REGEX_OTO = r'^\d{2}-?[A-Z]-?\d{3}\.?\d{2}$'
+    REGEX_XEMAY = r'^(?:\d{2}-?[A-Z]\d-?\d{2,3}\.?\d{2}|\d{2}-?[A-Z]{2}-?\d{2,3}\.?\d{2})$'
+    if re.match(REGEX_OTO, plate):
+        return "Ôtô"
+    elif re.match(REGEX_XEMAY, plate):
+        return "Xe máy"
+    else:
+        return "Không xác định"
+
+def init_license_plate_db(db_path="license_plates.db"):
+    """
+    Tạo database SQLite và bảng nếu chưa tồn tại
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS plates (
+        id TEXT PRIMARY KEY,
+        plate_number TEXT NOT NULL,
+        vehicle_type TEXT,
+        owner_name TEXT,
+        points INTEGER DEFAULT 0,
+        fine_amount INTEGER DEFAULT 0,
+        detected_at TEXT,
+        image_path TEXT,
+        confidence REAL
+    )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print(f"Database initialized: {db_path}")
+
+def save_to_db(plate: str, vehicle_type: str, confidence: float, 
+               image_path: str = "", db_path="license_plates.db"):
+    """
+    Lưu thông tin biển số + dữ liệu giả lập vào SQLite
+    """
+    if not plate or plate == "Unknown":
+        return
+    
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Dữ liệu giả lập
+    fake_owners = [
+        "Nguyễn Văn An", "Trần Thị Bình", "Lê Hoàng Cường", "Phạm Minh Đức",
+        "Hoàng Thị Mai", "Vũ Văn Nam", "Đỗ Thị Lan", "Bùi Quang Huy",
+        "Ngô Thị Hồng", "Phan Văn Khánh"
+    ]
+    
+    owner = random.choice(fake_owners)
+    points = random.randint(0, 12)          # điểm nguội giả lập
+    fine = random.randint(0, 1) * random.choice([200000, 400000, 800000, 1200000, 0, 0, 0])
+    
+    # ID unique
+    record_id = str(uuid.uuid4())
+    detected_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    cursor.execute('''
+    INSERT OR REPLACE INTO plates 
+    (id, plate_number, vehicle_type, owner_name, points, fine_amount, detected_at, image_path, confidence)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        record_id,
+        plate,
+        vehicle_type,
+        owner,
+        points,
+        fine,
+        detected_time,
+        image_path,
+        round(confidence, 4)
+    ))
+    
+    conn.commit()
+    conn.close()
+    
+    print(f"Đã lưu vào DB: {plate} | {vehicle_type} | Chủ xe: {owner} | Điểm: {points} | Phạt: {fine:,}đ")
+    
 
 if __name__ == "__main__":
-
+    is_create_db = True
+    is_save_db = True
+    if is_create_db:
+        init_license_plate_db(db_path="license_plates.db")
+    
     # Tự động tìm project root
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)  # Lên 1 cấp từ scripts
@@ -589,7 +698,7 @@ if __name__ == "__main__":
     if test_folder:
         print(f"Thư mục test: {test_folder}")
         print(f"Project root: {project_root}")
-        full_pipeline(test_folder)
+        full_pipeline(test_folder, is_save_db=is_save_db)
     else:
         print("Không tìm thấy thư mục test images!")
         print(f"Project root: {project_root}")

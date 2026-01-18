@@ -71,3 +71,5 @@ python train_yolo11.py
 ```bash
 python full_pipline.py
 ```
+
+

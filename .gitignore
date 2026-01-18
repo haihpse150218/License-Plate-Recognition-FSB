@@ -33,3 +33,4 @@ uploads/
 # --- System Files ---
 Thumbs.db
 Desktop.ini
+*.pyc
