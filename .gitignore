@@ -15,9 +15,9 @@ venv/
 data/
 test_images/
 
-# --- Training Results (Mô hình và log train) ---
-# Folder runs chứa weights rất nặng
-runs/
+# # --- Training Results (Mô hình và log train) ---
+# # Folder runs chứa weights rất nặng
+# runs/
 
 # --- Generated Outputs (Kết quả chạy pipeline) ---
 results_final/
@@ -27,8 +27,8 @@ results/
 uploads/
 
 # --- Large Model Files (Nếu lỡ để file .pt ở ngoài root) ---
-*.pt
-*.onnx
+# *.pt
+# *.onnx
 
 # --- System Files ---
 Thumbs.db
