@@ -12,6 +12,12 @@ import io
 from PIL import Image
 from typing import List, Optional
 import uvicorn
+import sys
+
+# Thêm thư mục hiện tại vào sys.path để import được manual_full_pipline
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 # Import các function từ manual_full_pipline.py
 from manual_full_pipline import (
@@ -63,9 +69,9 @@ def init_models():
 
     global yolo_model, trocr_loaded, project_root
     
-    # Tìm project root
+    # Tìm project root (lên 3 cấp từ backend/app/backend_18012026/)
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(script_dir)))
     
     # Tìm YOLO model
     possible_paths = [
